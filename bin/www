@@ -5,21 +5,32 @@
  */
 
 var app = require('../app');
-var debug = require('debug')('restapi-angosoftwares:server');
-var http = require('http');
+var debug = require('debug')('realtimeapi-angosoftwares:server');
+//var http = require('http');
+const https = require('https'); //Using the https module to be used with our certificate
+
+const fs= require('fs'); //Using file system module
+const options = { //Begin options for https
+  key: fs.readFileSync('./angosoftwares_cert/server.key', 'utf8'),
+  cert: fs.readFileSync('./angosoftwares_cert/server.crt', 'utf8'),
+  //requestCert: false, //DO not request cert to any application connected to this. TODO: change this for production
+  //rejectUnauthorized: false, //DO not reject self-signed certificate from any application connected to this. TODO: change this for production
+} //End options for https
 
 /**
  * Get port from environment and store in Express.
  */
 
-var port = normalizePort(process.env.PORT || '3000');
+var port = normalizePort(process.env.PORT || '8082');
 app.set('port', port);
 
 /**
- * Create HTTP server.
+ * Create HTTP (+TLS) server.
  */
 
-var server = http.createServer(app);
+//var server = http.createServer(app);
+process.env.NODE_TLS_REJECT_UNAUTHORIZED="0"; //Allow self signed certificate to remote. TODO: change this for production
+var server = https.createServer(options, app); //Intantiating the server with the https module defined rather than simple http
 
 /**
  * Listen on provided port, on all network interfaces.
