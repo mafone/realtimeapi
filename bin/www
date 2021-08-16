@@ -5,29 +5,144 @@
  */
 
 var app = require('../app');
-var debug = require('debug')('restapi-angosoftwares:server');
+var debug = require('debug')('realtimeapi-angosoftwares:server');
 var http = require('http');
+const https = require('https'); //Using the https module to be used with our certificate
+
+const fetch = require('node-fetch'); ////Import the package to fetch data
+
+const fs= require('fs'); //Using file system module
+const options = { //Begin options for https
+  key: fs.readFileSync('./.cert/angola_sytes_net.key', 'utf8'),
+  cert: fs.readFileSync('./.cert/angola_sytes_net.pem', 'utf8'),
+  //requestCert: false, //DO not request cert to any application connected to this. TODO: change this for production
+  //rejectUnauthorized: false, //DO not reject self-signed certificate from any application connected to this. TODO: change this for production
+} //End options for https
 
 /**
  * Get port from environment and store in Express.
  */
 
-var port = normalizePort(process.env.PORT || '3000');
+var port = normalizePort(process.env.PORT || '8082');
 app.set('port', port);
 
 /**
- * Create HTTP server.
+ * Create HTTP (+TLS) server.
  */
 
-var server = http.createServer(app);
+//var server = http.createServer(app);
+process.env.NODE_TLS_REJECT_UNAUTHORIZED="0"; //Allow self signed certificate to remote. TODO: change this for production
 
-/**
- * Listen on provided port, on all network interfaces.
- */
+const hosts = require('../hosts');
+const server = https.createServer(options, app);
+const io = require('socket.io')(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+})
+
+//Begin socket.on
+io.on('connection', (client) => { //Open the socket connection
+  /************************************************************BEGIN GETS***************************************************************************************************************************** */
+  //TODO: For all tables we'll have just one route with the table name for all methods (GET, POST and DELETE) as POST
+  client.on('GetPostPutDelete', (data1, token1, component1) => { //saveEditDelete
+    console.log ('##################GetPostPutDelete##################');
+    //console.log("genericEntidades -> Data = ", data1);
+    //console.log ('listen -> ', data1.listenMessage)
+    //console.log("genericEntidades -> Data To Send = ", data1.data_to_send);
+    console.log("#######################genericEntidades -> ID = ", data1.data_to_send);
+    console.log("#######################genericEntidades -> ID = ", data1.data_to_send);
+    console.log("#######################genericEntidades -> ID = ", data1.data_to_send);
+    console.log("#######################genericEntidades -> ID = ", data1.data_to_send);
+    console.log("#######################genericEntidades -> ID = ", data1.data_to_send);
+    console.log("#######################genericEntidades -> ID = ", data1.data_to_send);
+    console.log("#######################genericEntidades -> ID = ", data1.data_to_send);
+    console.log("#######################genericEntidades -> ID = ", data1.data_to_send);
+
+    // TODO: change the way this is sent not to lose chars
+    fetch("https://" + hosts.ango_restapi+'/'+data1.route, {
+      method: 'POST', //method: 'DELETE',
+      /*Not necessary*/
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        //id: id1, //Not necessary for node rest
+        data: data1,
+        token: token1, //TODO: this permissions should be inside data1
+        component: component1 //TODO: this permissions should also be inside data1
+      })
+    })
+      .then(response => response.json()) //Parsing the post response to json
+      .then(responseJson => { //Using the result as a promise
+        if ((data1.operation !== 'SelectAll') && (data1.operation !== 'SelectOne')){ //TODO: Without Internal server error????
+          console.log("################# -> ", responseJson)
+          console.log("################# -> ", responseJson)
+          console.log("################# -> ", responseJson)
+          console.log("################# -> ", responseJson)
+          console.log("################# -> ", responseJson)
+          console.log("################# -> ", responseJson)
+          console.log("################# -> ", responseJson)
+          console.log("################# -> ", responseJson)
+          console.log("################# -> ", responseJson)
+          console.log("################# -> ", responseJson)
+          if(responseJson.data.status == 200){
+            console.log('Atualizar tabela ... ');
+            //Case the operation above is not SelectAll, we need to select updated data below
+            dataSend = {'route':data1.route, listenMessage: data1.listenMessage, 'operation': 'SelectAll' , 'data_to_send':[{'table':data1.data_to_send[0].table, 'fields':[], 'values':[], 'id':{}}]};
+            fetch("https://" + hosts.ango_restapi+'/'+data1.route, { //POST fetch for any route/table
+              method: 'POST',
+              headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                data: dataSend,
+                token: token1, //TODO: this permissions should be inside data1
+                component: component1 //TODO: this permissions should also be inside data1
+              })
+            })
+              .then((response) => response.json()) //Parsing the post response to json
+              .then((responseJson) => { //waiting for the promise in this callback
+                io.emit(dataSend.listenMessage, responseJson); //The requester will receive the error
+              })
+              .catch((error) => { //Error during POST
+                console.error(error);
+                io.emit(dataSend.listenMessage, {"error": responseJson.error }); //The requester will receive the error
+              });
+          }
+          else{//Internal server error
+            io.emit(data1.listenMessage, responseJson); 
+          }
+        }
+        else{
+          console.log('Checking response status ... ');
+          jsonResponse = JSON.parse(responseJson)
+          console.log(jsonResponse)
+          if(jsonResponse.data.status == 200){
+            console.log('buscarDados tabela ... ');
+            io.emit(data1.listenMessage, responseJson); //The requester will receive the error
+          }
+          else{//Internal server error
+            console.log('Erro...');
+            console.log(responseJson);
+            io.emit(data1.listenMessage, responseJson); 
+          }
+        }
+      })
+      .catch((error) => { //Handle any other exception during POST
+        console.log("##############################", "https://" + hosts.ango_restapi+'/'+data1.route)
+        console.log ("error -> ", error)
+        io.emit(data1.listenMessage, {"error": error });
+      });
+  });
+});//End socket.on
 
 server.listen(port);
-server.on('error', onError);
-server.on('listening', onListening);
+// server.on('error', onError);
+// server.on('listening', onListening);
 
 /**
  * Normalize a port into a number, string, or false.
